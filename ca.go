@@ -6,35 +6,34 @@
 package localca
 
 import (
-	"bytes"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 )
 
 // CA represents a self-signed certificate authority.
 // It can be used to generate new server certificates.
 type CA struct {
-	key Key
-	pem []byte
-	crt *x509.Certificate
-
 	mu   sync.RWMutex
 	conf Config
+	PEM  string
+	key  Key
+	crt  *x509.Certificate
 	srv  *tls.Certificate
 }
 
 // Read returns a CA from an existing certificate in PEM format.
-func Read(conf *Config, key Key, caPEM []byte) (ca *CA, err error) {
-	ca = &CA{key: key, pem: caPEM, conf: DefaultConfig}
+func Read(conf *Config, key Key, caPEM string) (ca *CA, err error) {
+	ca = &CA{conf: DefaultConfig, PEM: caPEM, key: key}
 	if conf != nil {
 		ca.conf = *conf
 	}
-	b, _ := pem.Decode(ca.pem)
+	b, _ := pem.Decode([]byte(ca.PEM))
 	ca.crt, err = x509.ParseCertificate(b.Bytes)
 	if err != nil {
 		return nil, err
@@ -44,7 +43,7 @@ func Read(conf *Config, key Key, caPEM []byte) (ca *CA, err error) {
 
 // New returns a new self-signed certificate authority.
 func New(conf *Config, key Key) (ca *CA, err error) {
-	ca = &CA{key: key, conf: DefaultConfig}
+	ca = &CA{conf: DefaultConfig, key: key}
 	if conf != nil {
 		ca.conf = *conf
 	}
@@ -62,7 +61,7 @@ func New(conf *Config, key Key) (ca *CA, err error) {
 	if err != nil {
 		return nil, err
 	}
-	ca.pem = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	ca.PEM = string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}))
 	return ca, nil
 }
 
@@ -94,7 +93,7 @@ func (ca *CA) newCert(names ...string) (*tls.Certificate, error) {
 		return nil, err
 	}
 	pem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
-	cert, err := tls.X509KeyPair(pem, k.PEM)
+	cert, err := tls.X509KeyPair(pem, []byte(k.PEM))
 	if err != nil {
 		return nil, err
 	}
@@ -124,10 +123,5 @@ func (ca *CA) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/x-pem-file")
-	io.Copy(w, bytes.NewReader(ca.pem))
-}
-
-// PEM returns the pem encoded ca certificate as io.Reader.
-func (ca *CA) PEM() io.Reader {
-	return bytes.NewReader(ca.pem)
+	io.Copy(w, strings.NewReader(ca.PEM))
 }

@@ -15,7 +15,7 @@ import (
 
 // Key represents the same ECDSA both PEM encoded and as structure.
 type Key struct {
-	PEM []byte
+	PEM string
 	*ecdsa.PrivateKey
 }
 
@@ -31,12 +31,13 @@ func NewKey() (Key, error) {
 		return Key{}, err
 	}
 	// encode the key to pem
-	return Key{pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: der}), k}, nil
+	pem := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: der})
+	return Key{string(pem), k}, nil
 }
 
 // ReadKey reads a PEM encoded ECDSA key.
-func ReadKey(keyPEM []byte) (Key, error) {
-	b, _ := pem.Decode(keyPEM)
+func ReadKey(keyPEM string) (Key, error) {
+	b, _ := pem.Decode([]byte(keyPEM))
 	key, err := x509.ParseECPrivateKey(b.Bytes)
 	if err != nil {
 		return Key{keyPEM, nil}, err

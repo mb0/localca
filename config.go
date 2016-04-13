@@ -57,7 +57,11 @@ func (c *Config) fillTmpl(t *x509.Certificate) {
 
 // fillNames adds DNS names and IP addresses to the server template
 func (c *Config) fillNames(names []string) {
-	t := &c.CertTmpl
+	FillNames(&c.CertTmpl, names)
+}
+
+// FillNames adds DNS names and IP addresses to the certificate template t
+func FillNames(t *x509.Certificate, names []string) {
 	dns := t.DNSNames
 	ips := t.IPAddresses
 	for _, str := range names {
